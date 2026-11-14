@@ -62,6 +62,6 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        web.loadUrl("https://enriquedell.github.io/emla-khan-karimi/")
+        web.loadUrl("file:///android_asset/www/index.html")
     }
 }
