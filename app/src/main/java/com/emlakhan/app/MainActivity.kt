@@ -5,20 +5,25 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
+import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import java.util.Locale
 
 // املاخوان - طراح: منوچهر کریمی
 class MainActivity : AppCompatActivity() {
+    private lateinit var root: FrameLayout
     private lateinit var web: WebView
+    private var overlay: WebView? = null
     private var tts: TextToSpeech? = null
     private var faOk = false
 
@@ -49,15 +54,54 @@ class MainActivity : AppCompatActivity() {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
+    private fun openOverlay(url: String) {
+        if (overlay != null) return
+        val w = WebView(this)
+        w.settings.javaScriptEnabled = true
+        w.settings.domStorageEnabled = true
+        w.settings.mediaPlaybackRequiresUserGesture = false
+        w.webViewClient = WebViewClient()
+        root.addView(
+            w,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        )
+        overlay = w
+        w.loadUrl(url)
+    }
+
+    private fun closeOverlay(): Boolean {
+        val w = overlay ?: return false
+        if (w.canGoBack()) {
+            w.goBack()
+            return true
+        }
+        root.removeView(w)
+        w.destroy()
+        overlay = null
+        return true
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        root = FrameLayout(this)
         web = WebView(this)
-        setContentView(web)
+        root.addView(web)
+        setContentView(root)
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
         web.settings.mediaPlaybackRequiresUserGesture = false
-        web.webViewClient = WebViewClient()
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val s = request.url.scheme
+                if (s == "http" || s == "https") {
+                    openOverlay(request.url.toString())
+                    return true
+                }
+                return false
+            }
+        }
         web.addJavascriptInterface(TtsBridge(), "AndroidTTS")
 
         tts = TextToSpeech(this) { status ->
@@ -108,6 +152,7 @@ class MainActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (closeOverlay()) return
                 val js = "(function(){var w=document.getElementById('work');" +
                     "if(w&&!w.hidden){document.getElementById('btnBack').click();return 'back';}return 'exit';})()"
                 web.evaluateJavascript(js) { r -> if (r == null || r.contains("exit")) finish() }
@@ -118,6 +163,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        overlay?.destroy()
         tts?.stop()
         tts?.shutdown()
         super.onDestroy()
