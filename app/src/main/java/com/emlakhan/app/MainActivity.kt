@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val s = request.url.scheme
                 if (s == "http" || s == "https") {
-                    openOverlay(request.url.toString())
+                    openOvethis@MainActivity.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, request.url))rlay(request.url.toString())
                     return true
                 }
                 return false
